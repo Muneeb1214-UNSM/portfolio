@@ -1,5 +1,3 @@
 streamlit
-browser-use
-langchain-openai>=0.2.5
 playwright
 python-dotenv
