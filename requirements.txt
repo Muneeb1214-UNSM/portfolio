@@ -1,5 +1,5 @@
-streamlit==1.32.0
-browser-use==0.1.0
-langchain-openai==0.0.8
-playwright==1.42.0
-python-dotenv==1.0.1
+streamlit
+browser-use
+langchain-openai>=0.2.5
+playwright
+python-dotenv
