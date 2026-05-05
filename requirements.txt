@@ -1,5 +1,5 @@
-streamlit
+gradio
 browser-use
-langchain-openai>=0.2.5
-playwright
+langchain-openai
 python-dotenv
+playwright
