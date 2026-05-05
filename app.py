@@ -1,71 +1,68 @@
 import os
-import subprocess
-import sys
 import asyncio
-
-# --- AUTO-INSTALLER (Agar Streamlit Cloud fail ho jaye) ---
-def install_libraries():
-    try:
-        import browser_use
-        import langchain_openai
-    except ImportError:
-        # Agar libraries nahi milti, to hum manual install karenge lekin error handle karke
-        subprocess.run([sys.executable, "-m", "pip", "install", "browser-use", "langchain-openai>=0.2.5", "playwright", "python-dotenv"])
-
-# Install libraries before anything else
-install_libraries()
-
-import streamlit as st
-from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
-
-# --- PLAYWRIGHT SETUP ---
-@st.cache_resource
-def setup_playwright():
-    # Chromium aur uski dependencies install karna
-    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"])
-    # System dependencies ko skip karenge kyunki packages.txt handle karega
-
-setup_playwright()
-
-# Ab imports karein (Jab confirm ho jaye ke install ho gayi hain)
+import gradio as gr
+from langchain_openai import ChatOpenAI
 from browser_use import Agent, Browser, BrowserConfig
 
 load_dotenv()
 
-# UI Setup
-st.set_page_config(page_title="AI Browser Agent", page_icon="🤖")
-st.title("🤖 Vision AI Web Agent")
-st.info("Built for Hackathon | Stable Version 3.11")
+# Playwright install command (locally ya server par)
+import subprocess
+import sys
 
-with st.sidebar:
-    st.header("Settings")
-    api_key = st.text_input("OpenAI API Key", type="password")
-    model_name = st.selectbox("Model", ["gpt-4o", "gpt-4o-mini"])
+def setup_browser():
+    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"])
 
-user_task = st.text_area("Hukum karein?", placeholder="e.g. Open Google and search for latest AI news.")
+setup_browser()
 
-async def run_agent(task, key, model):
-    llm = ChatOpenAI(model=model, api_key=key)
-    browser = Browser(config=BrowserConfig(headless=True))
-    agent = Agent(task=task, llm=llm, browser=browser)
-    result = await agent.run()
-    return result
-
-if st.button("Run Agent 🚀"):
+# --- AGENT FUNCTION ---
+async def run_omni_agent(api_key, user_goal):
     if not api_key:
-        st.error("Sidebar mein OpenAI API Key dalein!")
-    elif not user_task:
-        st.warning("Task likhein!")
-    else:
-        try:
-            with st.status("AI Agent kaam kar raha hai (Video record ho rahi hai)...", expanded=True) as status:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                final_result = loop.run_until_complete(run_agent(user_task, api_key, model_name))
-                
-                status.update(label="✅ Task Complete!", state="complete")
-                st.success("Result:")
-                st.write(final_result)
-        except Exception as e:
-            st.error(f"Error: {str(e)}")
+        return "Error: Please provide an OpenAI API Key."
+    
+    os.environ["OPENAI_API_KEY"] = api_key
+    
+    # Brain: GPT-4o use karenge jo sabse aqalmand hai
+    llm = ChatOpenAI(model="gpt-4o")
+    
+    # Browser: Headless=False taake demo ke waqt judges ko nazar aaye
+    # (Agar deployment hai to Headless=True kar dein)
+    browser = Browser(config=BrowserConfig(headless=True)) 
+    
+    agent = Agent(
+        task=user_task,
+        llm=llm,
+        browser=browser
+    )
+
+    try:
+        # Agent task shuru karega
+        result = await agent.run()
+        # Final result extraction
+        return result.final_result()
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+# --- GRADIO UI (Professional Look) ---
+def start_task(api_key, task):
+    return asyncio.run(run_omni_agent(api_key, task))
+
+with gr.Blocks(theme=gr.themes.Soft()) as demo:
+    gr.Markdown("# 🌐 Omni-Agent: Autonomous Web Executive")
+    gr.Markdown("Complex tasks dain, agent browser khud handle karega.")
+    
+    with gr.Row():
+        with gr.Column():
+            key_input = gr.Textbox(label="OpenAI API Key", placeholder="sk-...", type="password")
+            task_input = gr.Textbox(label="What do you want the agent to do?", 
+                                    placeholder="e.g. Find the best laptop under 1 lakh on different Pak sites and compare.")
+            btn = gr.Button("Execute Task 🚀", variant="primary")
+        
+        with gr.Column():
+            output = gr.Textbox(label="Agent's Final Report", lines=10)
+
+    btn.click(fn=start_task, inputs=[key_input, task_input], outputs=output)
+
+if __name__ == "__main__":
+    demo.launch()
